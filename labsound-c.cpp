@@ -1,6 +1,6 @@
 
 #ifndef LABSOUNDC_H
-#include "LabSound-C.h"
+#include "LabSound-c.h"
 #endif
 
 #include <LabSound/LabSound.h>
@@ -462,6 +462,8 @@ ls_PinDataType pin_data_type(struct LabSoundAPI_1_0* ls,
                 return ls_Bool;
             case lab::SettingType::Integer:
                 return ls_Int;
+            case lab::SettingType::Float:
+                return ls_Float;
             case lab::SettingType::Enum:
                 return ls_Enum;
             case lab::SettingType::Bus:
@@ -848,7 +850,8 @@ struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc alloc) {
     api->_detail->has_connection_rel = ecs_new_id(api->_detail->ecs);
 
     EcsRest ecs_rest{ 0 };
-    ecs_singleton_set(api->_detail->ecs, EcsRest, ecs_rest);
+    ecs_set_id(api->_detail->ecs, FLECS__EEcsRest, FLECS__EEcsRest, sizeof(EcsRest), &ecs_rest);
+    //ecs_singleton_set(api->_detail->ecs, EcsRest, ecs_rest);
 
     ecs_app_set_run_action(ls_1_0::ecs_run_action);
 

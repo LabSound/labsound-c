@@ -13,8 +13,8 @@ extern "C" {
 #endif
 
 typedef struct {
-    char const* start;
-    char const* end;
+    const char* start;
+    const char* end;
 } ls_StringSlice;
 
 #define ls_cstr(s) ls_StringSlice { (s), strlen(s) }
