@@ -43,6 +43,11 @@ typedef struct {
 } ls_Connection;
 const ls_Connection ls_Connection_empty = { 0 };
 
+typedef struct {
+    uint64_t id;
+} ls_BusData;
+const ls_BusData ls_BusData_empty = { 0 };
+
 typedef enum {
     ls_PinInvalid = 0, 
     ls_PinInput, ls_PinOutput, ls_PinParam, ls_PinSetting
@@ -91,6 +96,9 @@ struct LabSoundAPI_1_0 {
     ls_Pin (*node_setting)(struct LabSoundAPI_1_0*,
         ls_Node, ls_StringSlice);
 
+    void (*node_set_on_ended)(struct LabSoundAPI_1_0*,
+        ls_Node, void(*)());
+
     ls_PinKind (*pin_kind)(struct LabSoundAPI_1_0*,
         ls_Pin);
     
@@ -123,12 +131,19 @@ struct LabSoundAPI_1_0 {
 
     void (*set_bool)(struct LabSoundAPI_1_0*,
         ls_Pin, bool);
-    
+
+    void (*set_bus)(struct LabSoundAPI_1_0*,
+        ls_Pin, ls_BusData);
+   
     void (*set_bus_from_file)(struct LabSoundAPI_1_0*,
         ls_Pin, ls_StringSlice path);
 
     void (*set_named_enum)(struct LabSoundAPI_1_0*,
         ls_Pin, ls_StringSlice enum_name);
+
+    // managing busses
+    ls_BusData (*bus_create_from_file)(struct LabSoundAPI_1_0*,
+        const char* path, bool mix_to_mono);
 
     // graph management
     //

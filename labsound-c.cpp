@@ -47,12 +47,17 @@ struct e_Connection {
     bool to_is_param;
 };
 
+struct e_BusData {
+    uint32_t hash_index;
+};
+
 ECS_COMPONENT_DECLARE(e_Node);
 ECS_COMPONENT_DECLARE(e_Input);
 ECS_COMPONENT_DECLARE(e_Output);
 ECS_COMPONENT_DECLARE(e_Param);
 ECS_COMPONENT_DECLARE(e_Setting);
 ECS_COMPONENT_DECLARE(e_Connection);
+ECS_COMPONENT_DECLARE(e_BusData);
 
 // Returns input, output
 inline std::pair<lab::AudioStreamConfig, lab::AudioStreamConfig> 
@@ -78,6 +83,7 @@ struct LabSoundAPI_1_0_Detail {
     ls_Node device_node;
     uint32_t next_id;
     unordered_map<uint32_t, shared_ptr<lab::AudioNode>> nodes;
+    unordered_map<uint32_t, shared_ptr<lab::AudioBus>> busses;
     ecs_world_t *ecs;
     ecs_entity_t has_input_rel;
     ecs_entity_t has_output_rel;
@@ -400,8 +406,8 @@ ls_Pin node_setting(struct LabSoundAPI_1_0* ls,
     if (e)
         return ls_Pin { e };
 
-    auto setting = ln->setting_index(nameStr.c_str());
-    if (!setting)
+    int setting = ln->setting_index(nameStr.c_str());
+    if (setting < 0)
         return ls_Pin_empty;
 
     e_Setting eSetting { n, setting };
@@ -418,6 +424,21 @@ ls_Pin node_setting(struct LabSoundAPI_1_0* ls,
 
     return ls_Pin { e };
 }
+
+void node_set_on_ended(struct LabSoundAPI_1_0* ls,
+    ls_Node n, void(*fn)())
+{
+    auto ln = ls_node(ls, n);
+    if (!ln)
+        return;
+
+    auto san = dynamic_cast<lab::AudioScheduledSourceNode*>(ln.get());
+    if (!san)
+        return;
+
+    san->setOnEnded([fn]() { fn(); });
+}
+
 
 ls_PinKind pin_kind(struct LabSoundAPI_1_0* ls,
     ls_Pin p)
@@ -671,6 +692,27 @@ void set_bool(struct LabSoundAPI_1_0* ls,
      }
 }
 
+void set_bus(struct LabSoundAPI_1_0* ls,
+    ls_Pin p, ls_BusData d)
+{
+    auto w = ls->_detail->ecs;
+    if (!ecs_is_alive(w, p.id) || !ecs_is_alive(w, d.id))
+        return;
+
+    const e_Setting* es = ecs_get(w, p.id, e_Setting);
+    if (!es)
+        return;
+
+    auto ln = ls_node(ls, es->node);
+    if (ln && ln->setting(es->index)) {
+        const e_BusData* bd = ecs_get(w, d.id, e_BusData);
+        auto it = ls->_detail->busses.find(bd->hash_index);
+        if (it != ls->_detail->busses.end() && it->second.get()) {
+            ln->setting(es->index)->setBus(it->second.get());
+        }
+    }
+}
+
 void set_bus_from_file(struct LabSoundAPI_1_0* ls,
     ls_Pin p, ls_StringSlice path)
 {
@@ -679,13 +721,14 @@ void set_bus_from_file(struct LabSoundAPI_1_0* ls,
         return;
 
     const e_Setting* es = ecs_get(w, p.id, e_Setting);
-    if (es) {
-        auto ln = ls_node(ls, es->node);
-        if (ln && ln->setting(es->index)) {
-            string pathStr(path.start, path.end - path.start);
-            auto soundClip = lab::MakeBusFromFile(pathStr.c_str(), false);
-            ln->setting(es->index)->setBus(soundClip.get());
-        }
+    if (!es)
+        return;
+
+    auto ln = ls_node(ls, es->node);
+    if (ln && ln->setting(es->index)) {
+        string pathStr(path.start, path.end - path.start);
+        auto soundClip = lab::MakeBusFromFile(pathStr.c_str(), false);
+        ln->setting(es->index)->setBus(soundClip.get());
     }
 }
 
@@ -801,6 +844,36 @@ int ecs_run_action(
     return ecs_app_run_frame(world, desc) == 0;
 }
 
+
+static
+ls_BusData bus_create_from_file(struct LabSoundAPI_1_0* ls, 
+    const char* name, bool mix_to_mono)
+{
+    const std::string path(name);
+    std::shared_ptr<lab::AudioBus> bus;
+    try {
+        bus = lab::MakeBusFromFile(path, mix_to_mono);
+    }
+    catch (...) {
+        return ls_BusData_empty;
+    }
+    if (!bus)
+        return ls_BusData_empty;
+
+    uint32_t id = ls->_detail->next_id++;
+    ls->_detail->busses.insert({ id , bus });
+    e_BusData en = { id };
+    ecs_entity_desc_t desc = { 0 };
+    desc.name = path.c_str();
+    auto e = ecs_entity_init(ls->_detail->ecs, &desc);
+    ecs_add(ls->_detail->ecs, e, e_BusData);
+    ecs_set_id(ls->_detail->ecs, e,
+        ecs_id(e_BusData), sizeof(en), &en);
+
+    return ls_BusData{ e };
+}
+
+
 } // namespace ls_1_0
 
 extern "C"
@@ -843,6 +916,7 @@ struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc alloc) {
     ECS_COMPONENT_DEFINE(api->_detail->ecs, e_Param);
     ECS_COMPONENT_DEFINE(api->_detail->ecs, e_Setting);
     ECS_COMPONENT_DEFINE(api->_detail->ecs, e_Connection);
+    ECS_COMPONENT_DEFINE(api->_detail->ecs, e_BusData);
     api->_detail->has_input_rel = ecs_new_id(api->_detail->ecs);
     api->_detail->has_output_rel = ecs_new_id(api->_detail->ecs);
     api->_detail->has_param_rel = ecs_new_id(api->_detail->ecs);
@@ -896,6 +970,8 @@ struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc alloc) {
     api->node_setting = node_setting;
     api->pin_kind = pin_kind;
     api->pin_data_type = pin_data_type;
+    api->node_set_on_ended = node_set_on_ended;
+
 
     // managing nodes
     //
@@ -909,9 +985,13 @@ struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc alloc) {
     api->set_float = set_float;
     api->set_int = set_int;
     api->set_bool = set_bool;
+    api->set_bus = set_bus;
     api->set_bus_from_file = set_bus_from_file;
     api->set_enum = set_enum;
     api->set_named_enum = set_named_enum;
+
+    // managing busses
+    api->bus_create_from_file = bus_create_from_file;
 
     // graph management
     //
