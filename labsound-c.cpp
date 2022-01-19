@@ -182,6 +182,31 @@ void node_start(struct LabSoundAPI_1_0* ls,
    asn->start(when.t);
 }
 
+void node_schedule(struct LabSoundAPI_1_0* ls,
+    ls_Node n, ls_Seconds when, int count)
+{
+    if (!count)
+        return;
+
+    auto ln = ls_node(ls, n);
+    if (!ln)
+        return;
+
+    lab::SampledAudioNode* san =
+        dynamic_cast<lab::SampledAudioNode*>(ln.get());
+    if (san) {
+        san->schedule(when.t, count);
+        return;
+    }
+
+    lab::AudioScheduledSourceNode* asn =
+        dynamic_cast<lab::AudioScheduledSourceNode*>(ln.get());
+    if (!asn)
+        return;
+
+    asn->start(when.t); // disregarding count.
+}
+
 void node_stop(struct LabSoundAPI_1_0* ls,
     ls_Node n, ls_Seconds when) 
 {
@@ -958,6 +983,7 @@ struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc alloc) {
     api->node_get_timing = node_get_timing;
     api->node_get_self_timing = node_get_self_timing;
     api->node_start = node_start;
+    api->node_schedule = node_schedule;
     api->node_stop = node_stop;
 
     // getting pins from nodes

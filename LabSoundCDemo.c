@@ -35,7 +35,7 @@ void demo_sleep(LabSoundAPI* ls, float seconds) {
     if (seconds > 0.f) {
         thrd_sleep(&(struct timespec) {
             .tv_sec = 0,
-                .tv_nsec = (long)(1000000000.f * seconds)
+            .tv_nsec = (long)(1000000000.f * seconds)
         }, NULL);
     }
     ls_idle(ls);
@@ -62,11 +62,14 @@ int main(int argc, char** argcv)
     MAKE_SLICE(Oscillator);
     MAKE_SLICE(SampledAudio);
     MAKE_SLICE(sourceBus);
+    MAKE_SLICE(StereoPanner);
+    MAKE_SLICE(pan);
 
     MAKE_SLICE(osc1);
     MAKE_SLICE(osc2);
     MAKE_SLICE(osc3);
     MAKE_SLICE(san);
+    MAKE_SLICE(stpan);
 
 
     //-------------------------------------------------------------------------
@@ -156,19 +159,47 @@ int main(int argc, char** argcv)
     char buff[1024];
     sprintf(buff, "%ssamples/mono-music-clip.wav", asset_base);
     ls_BusData musicClip = ls->bus_create_from_file(ls, buff, false);
+    ls_Node sampledAudio = ls->node_create(ls, san_s, SampledAudio_s);
+    ls_Pin src = ls->node_setting(ls, sampledAudio, sourceBus_s);
+    ls_Pin sa_out = ls->node_indexed_output(ls, sampledAudio, 0);
 
     if (musicClip.id != ls_BusData_empty.id)
     {
-        ls_Node sampledAudio = ls->node_create(ls, san_s, SampledAudio_s);
-        ls_Pin src = ls->node_setting(ls, sampledAudio, sourceBus_s);
-        ls_Pin sa_out = ls->node_indexed_output(ls, sampledAudio, 0);
-        ls->set_bus(ls, src, musicClip);
         ls_Connection connection3 = ls->connect_output_to_input(ls, destIn, sa_out);
+        ls->set_bus(ls, src, musicClip);
         ls->node_start(ls, sampledAudio, (ls_Seconds) { 0.f });
         ls->node_set_on_ended(ls, sampledAudio, san_on_ended);
 
         demo_sleep(ls, 20);
         printf("ended %s\n", ended_via_flag ? "properly via flag" : "improperly by timeout");
+        ls->disconnect(ls, connection3);
+    }
+
+    //-------------------------------------------------------------------------
+    printf("test: stereo panning\n");
+
+    sprintf(buff, "%ssamples/trainrolling.wav", asset_base);
+    ls_BusData trainClip = ls->bus_create_from_file(ls, buff, false);
+    ls->set_bus(ls, src, trainClip);
+
+    {
+        ls_Node stPanner = ls->node_create(ls, stpan_s, StereoPanner_s);
+        ls_Pin stPanner_out = ls->node_indexed_output(ls, stPanner, 0);
+        ls_Pin stPanner_in = ls->node_indexed_input(ls, stPanner, 0);
+        ls_Connection connection3 = ls->connect_output_to_input(ls, destIn, stPanner_out);
+        ls_Connection connection4 = ls->connect_output_to_input(ls, stPanner_in, sa_out);
+        ls->node_schedule(ls, sampledAudio, (ls_Seconds) { 0.f }, -1); // -1 to loop forever
+        ls_Pin pan_param = ls->node_parameter(ls, stPanner, pan_s);
+        float seconds = 4.f;
+        float half = seconds * 0.5f;
+        for (float i = 0; i < seconds; i += 0.01f) {
+            float x = (i - half) / half;
+            ls->set_float(ls, pan_param, x);
+            thrd_sleep(&(struct timespec) {
+                .tv_sec = 0,
+                .tv_nsec = (long)(1000000000.f * 0.01f)
+            }, NULL);
+        }
     }
 
     printf("test: all complete\n");

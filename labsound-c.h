@@ -73,6 +73,9 @@ struct LabSoundAPI_1_0 {
     void (*node_start)(struct LabSoundAPI_1_0*,
         ls_Node, ls_Seconds);
 
+    void (*node_schedule)(struct LabSoundAPI_1_0*,
+        ls_Node, ls_Seconds, int32_t);
+
     void (*node_stop)(struct LabSoundAPI_1_0*,
         ls_Node, ls_Seconds);
 
