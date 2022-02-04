@@ -71,7 +71,6 @@ int main(int argc, char** argcv)
     MAKE_SLICE(san);
     MAKE_SLICE(stpan);
 
-
     //-------------------------------------------------------------------------
     printf("test: list the registered nodes\n");
 
@@ -82,29 +81,29 @@ int main(int argc, char** argcv)
 
     //-------------------------------------------------------------------------
     printf("test: playing a 440 hz tone\n");
-
     ls_Node osc = ls->node_create(ls, osc1_s, Oscillator_s);
+    ls_Pin osc_out = ls->node_indexed_output(ls, osc, 0);
+    ls_Pin osc_freq = ls->node_parameter(ls, osc, frequency_s);
+    ls_Pin osc_detune = ls->node_parameter(ls, osc, detune_s);
+
     ls_Node dest = ls->device_node(ls);
+    ls_Pin dest_in = ls->node_indexed_input(ls, dest, 0);
+    ls_Connection osc_to_dest;
 
-    ls_Pin oscOut = ls->node_indexed_output(ls, osc, 0);
-    ls_Pin destIn = ls->node_indexed_input(ls, dest, 0);
-    ls_Connection connection1 = ls->connect_output_to_input(ls, destIn, oscOut);
-
+    osc_to_dest = ls->connect_output_to_input(ls, dest_in, osc_out);
     ls->node_start(ls, osc, (ls_Seconds) { 0.f });
-
     demo_sleep(ls, 0.5);
     //-------------------------------------------------------------------------
     printf("test: disconnect the oscillator (silence)\n");
 
-    ls->disconnect(ls, connection1);
+    ls->disconnect(ls, osc_to_dest);
 
     demo_sleep(ls, 0.5f);
     //-------------------------------------------------------------------------
     printf("test: reconnect the oscillator, play at 220Hz\n");
 
-    ls_Pin frequency_osc1 = ls->node_parameter(ls, osc, frequency_s);
-    ls->set_float(ls, frequency_osc1, 220.f);
-    connection1 = ls->connect_output_to_input(ls, destIn, oscOut);
+    ls->set_float(ls, osc_freq, 220.f);
+    osc_to_dest = ls->connect_output_to_input(ls, dest_in, osc_out);
     ls->node_start(ls, osc, (ls_Seconds) { 0.f });
 
     demo_sleep(ls, 0.5f);
@@ -118,39 +117,41 @@ int main(int argc, char** argcv)
     printf("test: create and play an oscillator at 880\n");
 
     osc = ls->node_create(ls, osc2_s, Oscillator_s);
-    frequency_osc1 = ls->node_parameter(ls, osc, frequency_s);
-    ls->set_float(ls, frequency_osc1, 880.f);
-    oscOut = ls->node_indexed_output(ls, osc, 0);
-    connection1 = ls->connect_output_to_input(ls, destIn, oscOut);
+    osc_out = ls->node_indexed_output(ls, osc, 0);
+    osc_freq = ls->node_parameter(ls, osc, frequency_s);
+    osc_detune = ls->node_parameter(ls, osc, detune_s);
+
+    ls->set_float(ls, osc_freq, 880.f);
+    osc_to_dest = ls->connect_output_to_input(ls, dest_in, osc_out);
     ls->node_start(ls, osc, (ls_Seconds) { 0.f });
 
     demo_sleep(ls, 0.5f);
     //-------------------------------------------------------------------------
     printf("test: modulate the oscillator at 440\n");
 
-    ls_Node osc2 = ls->node_create(ls, osc3_s, Oscillator_s);
-    ls_Pin frequency_osc2 = ls->node_parameter(ls, osc2, frequency_s);
-    ls->set_float(ls, frequency_osc2, 4.f);
-    ls_Pin amplitude_osc2 = ls->node_parameter(ls, osc2, amplitude_s);
-    ls->set_float(ls, amplitude_osc2, 40.f);
-    ls->set_float(ls, frequency_osc1, 440.f);
+    ls_Node lfo = ls->node_create(ls, osc3_s, Oscillator_s);
+    ls_Pin lfo_freq = ls->node_parameter(ls, lfo, frequency_s);
+    ls_Pin lfo_ampl = ls->node_parameter(ls, lfo, amplitude_s);
+    ls_Pin lfo_out = ls->node_indexed_output(ls, lfo, 0);
 
-    ls_Pin detune_osc1 = ls->node_parameter(ls, osc, detune_s);
-    ls_Pin osc2Out = ls->node_indexed_output(ls, osc2, 0);
-    ls_Connection connection2 = ls->connect_output_to_input(ls, detune_osc1, osc2Out);
-    ls->node_start(ls, osc2, (ls_Seconds) { 0.f });
+    ls->set_float(ls, lfo_freq, 2.f);
+    ls->set_float(ls, lfo_ampl, 10.f);
+    ls->set_float(ls, osc_freq, 440.f);
 
-    demo_sleep(ls, 0.5f);
+    ls_Connection lfo_to_osc = ls->connect_output_to_input(ls, osc_detune, lfo_out);
+    ls->node_start(ls, lfo, (ls_Seconds) { 0.f });
+
+    demo_sleep(ls, 2.f);
     //-------------------------------------------------------------------------
     printf("test: disconnect modulated oscillator\n");
 
-    ls->disconnect(ls, connection2);
+    ls->disconnect(ls, lfo_to_osc);
 
     demo_sleep(ls, 0.5f);
     //-------------------------------------------------------------------------
     printf("test: disconnect oscillator\n");
 
-    ls->disconnect(ls, connection1);
+    ls->disconnect(ls, osc_to_dest);
 
     demo_sleep(ls, 0.5f);
     //-------------------------------------------------------------------------
@@ -165,7 +166,7 @@ int main(int argc, char** argcv)
 
     if (musicClip.id != ls_BusData_empty.id)
     {
-        ls_Connection connection3 = ls->connect_output_to_input(ls, destIn, sa_out);
+        ls_Connection connection3 = ls->connect_output_to_input(ls, dest_in, sa_out);
         ls->set_bus(ls, src, musicClip);
         ls->node_start(ls, sampledAudio, (ls_Seconds) { 0.f });
         ls->node_set_on_ended(ls, sampledAudio, san_on_ended);
@@ -186,7 +187,7 @@ int main(int argc, char** argcv)
         ls_Node stPanner = ls->node_create(ls, stpan_s, StereoPanner_s);
         ls_Pin stPanner_out = ls->node_indexed_output(ls, stPanner, 0);
         ls_Pin stPanner_in = ls->node_indexed_input(ls, stPanner, 0);
-        ls_Connection connection3 = ls->connect_output_to_input(ls, destIn, stPanner_out);
+        ls_Connection connection3 = ls->connect_output_to_input(ls, dest_in, stPanner_out);
         ls_Connection connection4 = ls->connect_output_to_input(ls, stPanner_in, sa_out);
         ls->node_schedule(ls, sampledAudio, (ls_Seconds) { 0.f }, -1); // -1 to loop forever
         ls_Pin pan_param = ls->node_parameter(ls, stPanner, pan_s);
