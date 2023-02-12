@@ -1,9 +1,10 @@
 
 #ifndef LABSOUNDC_H
-#include "LabSound-c.h"
+#include "labsound-c.h"
 #endif
 
 #include <LabSound/LabSound.h>
+#include <LabSound/backends/AudioDevice_RtAudio.h>
 
 #include "flecs.h"
 
@@ -15,6 +16,7 @@ using std::unique_ptr;
 using std::string;
 using std::unordered_map;
 
+using namespace lab;
 
 struct e_Node {
     uint32_t hash_index;
@@ -60,25 +62,51 @@ ECS_COMPONENT_DECLARE(e_Connection);
 ECS_COMPONENT_DECLARE(e_BusData);
 
 // Returns input, output
-inline std::pair<lab::AudioStreamConfig, lab::AudioStreamConfig> 
-GetDefaultAudioDeviceConfiguration(const bool with_input = false)
-{
-    if (with_input)
-        return
-        {
-            lab::GetDefaultInputAudioDeviceConfiguration(),
-            lab::GetDefaultOutputAudioDeviceConfiguration()
-        };
-
-    return
-    {
-        lab::AudioStreamConfig(),
-        lab::GetDefaultOutputAudioDeviceConfiguration()
-    };
+inline std::pair<AudioStreamConfig, AudioStreamConfig>
+    GetDefaultAudioDeviceConfiguration(const bool with_input = true)
+{    
+    const std::vector<AudioDeviceInfo> audioDevices = lab::AudioDevice_RtAudio::MakeAudioDeviceList();
+    AudioDeviceInfo defaultOutputInfo, defaultInputInfo;
+    for (auto & info : audioDevices) {
+        if (info.is_default_output)
+            defaultOutputInfo = info;
+        if (info.is_default_input)
+            defaultInputInfo = info;
+    }
+    
+    AudioStreamConfig outputConfig;
+    if (defaultOutputInfo.index != -1) {
+        outputConfig.device_index = defaultOutputInfo.index;
+        outputConfig.desired_channels = std::min(uint32_t(2), defaultOutputInfo.num_output_channels);
+        outputConfig.desired_samplerate = defaultOutputInfo.nominal_samplerate;
+    }
+    
+    AudioStreamConfig inputConfig;
+    if (with_input) {
+        if (defaultInputInfo.index != -1) {
+            inputConfig.device_index = defaultInputInfo.index;
+            inputConfig.desired_channels = std::min(uint32_t(1), defaultInputInfo.num_input_channels);
+            inputConfig.desired_samplerate = defaultInputInfo.nominal_samplerate;
+        }
+        else {
+            throw std::invalid_argument("the default audio input device was requested but none were found");
+        }
+    }
+    
+    // RtAudio doesn't support mismatched input and output rates.
+    // this may be a pecularity of RtAudio, but for now, force an RtAudio
+    // compatible configuration
+    if (defaultOutputInfo.nominal_samplerate != defaultInputInfo.nominal_samplerate) {
+        float min_rate = std::min(defaultOutputInfo.nominal_samplerate, defaultInputInfo.nominal_samplerate);
+        inputConfig.desired_samplerate = min_rate;
+        outputConfig.desired_samplerate = min_rate;
+        printf("Warning ~ input and output sample rates don't match, attempting to set minimum");
+    }
+    return {inputConfig, outputConfig};
 }
 
 struct LabSoundAPI_1_0_Detail {
-    unique_ptr<lab::AudioContext> ac;
+    shared_ptr<lab::AudioContext> ac;
     ls_Alloc alloc;
     ls_Node device_node;
     uint32_t next_id;
@@ -146,7 +174,7 @@ ls_Seconds node_get_timing(struct LabSoundAPI_1_0* ls,
    if (!ln)
        return ls_Seconds { -1.f };
 
-   return ls_Seconds{ ln->graphTime.microseconds.count() * 1.e-6f };
+   return ls_Seconds{ ln->graphTime().microseconds.count() * 1.e-6f };
 }
 
 ls_Seconds node_get_self_timing(struct LabSoundAPI_1_0* ls,
@@ -156,8 +184,8 @@ ls_Seconds node_get_self_timing(struct LabSoundAPI_1_0* ls,
     if (!ln)
         return ls_Seconds{ -1.f };
 
-   return ls_Seconds{ ln->totalTime.microseconds.count() - 
-                      ln->graphTime.microseconds.count() * 1.e-6f };
+   return ls_Seconds{ ln->totalTime().microseconds.count() -
+                      ln->graphTime().microseconds.count() * 1.e-6f };
 }
 
 void node_start(struct LabSoundAPI_1_0* ls,
@@ -232,7 +260,8 @@ void node_stop(struct LabSoundAPI_1_0* ls,
 
 // getting pins from nodes
 //
-ls_Pin node_named_input(struct LabSoundAPI_1_0* ls,
+ls_Pin node_named_input(
+        struct LabSoundAPI_1_0* ls,
         ls_Node n, ls_StringSlice str) 
 {
     auto ln = ls_node(ls, n);
@@ -247,19 +276,19 @@ ls_Pin node_named_input(struct LabSoundAPI_1_0* ls,
     if (e)
         return ls_Pin { e };
 
-    auto & inputs = ln->inputs();
-    int index = 0;
-    for (auto& i : inputs) {
-        if (i->name == name) {
+    int ic = ln->numberOfInputs();
+    for (int idx = 0; idx < ic; ++idx) {
+        auto i = ln->input(idx);
+        if (i->name() == name) {
             // create the input pin on the fly
 
-            e_Input eIn { n, index };
+            e_Input eIn { n, idx };
             ecs_entity_desc_t desc = { 0 };
             desc.name = path.c_str();
             e = ecs_entity_init(ls->_detail->ecs, &desc);
             ecs_add(ls->_detail->ecs, e, e_Input);
             ecs_set_id(ls->_detail->ecs, e, 
-                    ecs_id(e_Input), sizeof(eIn), &eIn);
+                       ecs_id(e_Input), sizeof(eIn), &eIn);
 
             // associate the pin with the node
             ecs_add_pair(ls->_detail->ecs, n.id, ls->_detail->has_input_rel, e);
@@ -267,24 +296,23 @@ ls_Pin node_named_input(struct LabSoundAPI_1_0* ls,
 
             return ls_Pin { e };
         }
-        ++index;
     }
 
     return ls_Pin_empty;
 }
 
-ls_Pin node_indexed_input(struct LabSoundAPI_1_0* ls,
-    ls_Node n, int index) 
+ls_Pin node_indexed_input(
+        struct LabSoundAPI_1_0* ls,
+        ls_Node n, int index)
 {
     auto ln = ls_node(ls, n);
     if (!ln)
         return ls_Pin_empty;
 
-    auto & inputs = ln->inputs();
-    if (inputs.size() <= index)
+    if (ln->numberOfInputs() <= index)
         return ls_Pin_empty;
 
-    const string& name = inputs[index]->name;
+    string name = ln->input(index)->name();
     string path = string(ln->name()) + "(" + name;
 
     // return the pin if it's pin looked up already
@@ -324,9 +352,10 @@ ls_Pin node_named_output(struct LabSoundAPI_1_0* ls,
         return ls_Pin { e };
 
     // create the output pin on the fly
-    int index = 0;
-    for (auto& output : ln->outputs()) {
-        if (output->name == name) {
+    int ic = ln->numberOfOutputs();
+    for (int index = 0; index < ic; ++index) {
+        auto output = ln->output(index);
+        if (output->name() == name) {
             e_Output eOutput { n, index };
             ecs_entity_desc_t desc = { 0 };
             desc.name = path.c_str();
@@ -353,11 +382,10 @@ ls_Pin node_indexed_output(struct LabSoundAPI_1_0* ls,
     if (!ln)
         return ls_Pin_empty;
 
-    const auto& outputs = ln->outputs();
-    if (index >= outputs.size())
+    if (index >= ln->numberOfOutputs())
         return ls_Pin_empty;
 
-    string name = outputs[index]->name;
+    string name = ln->output(index)->name();
     string path = string(ln->name()) + ")" + name;
 
     // return the pin if it's pin looked up already
@@ -572,7 +600,7 @@ void node_delete(struct LabSoundAPI_1_0* ls,
     if (!ln)
         return;
 
-    ls->_detail->ac->disconnectInput(ln);
+    ls->_detail->ac->disconnect(ln);
 
     ecs_query_desc_t desc = {0};
     desc.filter.terms[0].id = ecs_pair(ls->_detail->has_connection_rel, n.id);
@@ -610,24 +638,26 @@ void node_delete(struct LabSoundAPI_1_0* ls,
     ecs_delete(w, n.id);           // and delete the node
 }
 
-void create_node_output(struct LabSoundAPI_1_0* ls,
-    ls_Node n, ls_StringSlice name, int channels)
+void create_node_output(
+        struct LabSoundAPI_1_0* ls,
+        ls_Node n, ls_StringSlice name, int channels)
 {
     auto w = ls->_detail->ecs;
     auto ln = ls_node(ls, n);
     if (!ln)
         return;
 
-    string nameStr(name.start, name.end - name.start);
-    int index = ln->output_index(nameStr.c_str());
-    if (index < 0) {
-        ln->addOutput(nameStr, channels, lab::AudioNode::ProcessingSizeInFrames);
+    string name_str(name.start, name.end - name.start);
+    auto existing_output = ln->output(name_str.c_str());
+    if (!existing_output) {
+        auto new_output = std::unique_ptr<AudioNodeOutput>(new AudioNodeOutput(ln.get(), name_str.c_str(), channels));
+        lab::ContextGraphLock r(ls->_detail->ac.get(), "create_node_output");
+        ln->addOutput(r, std::move(new_output));
     }
     else {
-        auto o = ln->output(index);
-        if (o->bus->numberOfChannels() != channels) {
-            lab::ContextRenderLock r(ls->_detail->ac.get(), "create_node_output");
-            o->bus->setNumberOfChannels(r, channels);
+        lab::ContextRenderLock r(ls->_detail->ac.get(), "create_node_output");
+        if (existing_output->bus(r)->numberOfChannels() != channels) {
+            existing_output->bus(r)->setNumberOfChannels(r, channels);
         }
     }
 }
@@ -848,7 +878,7 @@ void disconnect(struct LabSoundAPI_1_0* ls,
             to_node->param(ec->to_index), from_node, ec->from_output_index);
     }
     else {
-        ls->_detail->ac->disconnectNode(
+        ls->_detail->ac->disconnect(
             to_node, from_node, ec->to_index, ec->from_output_index);
     }
     ecs_delete(ls->_detail->ecs, c.id);
@@ -927,12 +957,17 @@ struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc alloc) {
     new(api->_detail) LabSoundAPI_1_0_Detail();
     api->_detail->alloc = alloc;
 
-    const auto defaultAudioDeviceConfigurations = 
-        GetDefaultAudioDeviceConfiguration(true);
-
-    api->_detail->ac = lab::MakeRealtimeAudioContext(
-                defaultAudioDeviceConfigurations.second, 
-                defaultAudioDeviceConfigurations.first);
+    AudioStreamConfig _inputConfig;
+    AudioStreamConfig _outputConfig;
+    auto config = GetDefaultAudioDeviceConfiguration(true);
+    _inputConfig = config.first;
+    _outputConfig = config.second;
+    std::shared_ptr<lab::AudioDevice_RtAudio> device(new lab::AudioDevice_RtAudio(_inputConfig, _outputConfig));
+    auto context = std::make_shared<lab::AudioContext>(false, true);
+    auto destinationNode = std::make_shared<lab::AudioDestinationNode>(*context.get(), device);
+    device->setDestinationNode(destinationNode);
+    context->setDestinationNode(destinationNode);
+    api->_detail->ac = context;
 
     api->_detail->ecs = ecs_init();
     ECS_COMPONENT_DEFINE(api->_detail->ecs, e_Node);
@@ -972,7 +1007,7 @@ struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc alloc) {
     ecs_set_id(api->_detail->ecs, e,
         ecs_id(e_Node), sizeof(en), &en);
 
-    api->_detail->nodes.insert({ 1, api->_detail->ac->device() });
+    api->_detail->nodes.insert({ 1, api->_detail->ac->destinationNode() });
     api->_detail->device_node = { e };
     api->_detail->next_id = 2;
 
