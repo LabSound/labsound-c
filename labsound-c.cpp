@@ -43,7 +43,8 @@ struct e_Setting {
 };
 
 struct e_Connection {
-    ls_Pin from_pin, to_pin;
+    ls_OutputPin from_pin;
+    ls_InputPin to_pin;
     ls_Node from_node, to_node;
     int from_output_index, to_index;
     bool to_is_param;
@@ -108,7 +109,7 @@ inline std::pair<AudioStreamConfig, AudioStreamConfig>
 struct LabSoundAPI_1_0_Detail {
     shared_ptr<lab::AudioContext> ac;
     ls_Alloc alloc;
-    ls_Node device_node;
+    ls_Node destination_node;
     uint32_t next_id;
     unordered_map<uint32_t, shared_ptr<lab::AudioNode>> nodes;
     unordered_map<uint32_t, shared_ptr<lab::AudioBus>> busses;
@@ -210,6 +211,16 @@ void node_start(struct LabSoundAPI_1_0* ls,
    asn->start(when.t);
 }
 
+void node_diagnose(struct LabSoundAPI_1_0* ls, ls_Node n)
+{
+    auto ln = ls_node(ls, n);
+    if (!ln)
+        return;
+
+    lab::AudioContext& ac = *ls->_detail->ac.get();
+    ac.diagnose(ln);
+}
+
 void node_schedule(struct LabSoundAPI_1_0* ls,
     ls_Node n, ls_Seconds when, int count)
 {
@@ -234,6 +245,17 @@ void node_schedule(struct LabSoundAPI_1_0* ls,
 
     asn->start(when.t); // disregarding count.
 }
+
+const char* node_scheduled_state_name(struct LabSoundAPI_1_0* ls,
+                                         ls_Node n)
+{
+    auto ln = ls_node(ls, n);
+    if (!ln)
+        return "Nonexistent node";
+    
+    return schedulingStateName(ln->schedulingState());
+}
+
 
 void node_stop(struct LabSoundAPI_1_0* ls,
     ls_Node n, ls_Seconds when) 
@@ -260,13 +282,13 @@ void node_stop(struct LabSoundAPI_1_0* ls,
 
 // getting pins from nodes
 //
-ls_Pin node_named_input(
+ls_InputPin node_named_input(
         struct LabSoundAPI_1_0* ls,
         ls_Node n, ls_StringSlice str) 
 {
     auto ln = ls_node(ls, n);
     if (!ln)
-        return ls_Pin_empty;
+        return ls_InputPin_empty;
 
     string name(str.start, str.end - str.start);
     string path = string(ln->name()) + "(" + name;
@@ -274,7 +296,7 @@ ls_Pin node_named_input(
     // return the pin if it's pin looked up already
     ecs_entity_t e = ecs_lookup(ls->_detail->ecs, path.c_str());
     if (e)
-        return ls_Pin { e };
+        return ls_InputPin { e };
 
     int ic = ln->numberOfInputs();
     for (int idx = 0; idx < ic; ++idx) {
@@ -294,23 +316,23 @@ ls_Pin node_named_input(
             ecs_add_pair(ls->_detail->ecs, n.id, ls->_detail->has_input_rel, e);
             ecs_add_pair(ls->_detail->ecs, e, EcsChildOf, n.id); // autodelete
 
-            return ls_Pin { e };
+            return ls_InputPin { e };
         }
     }
 
-    return ls_Pin_empty;
+    return ls_InputPin_empty;
 }
 
-ls_Pin node_indexed_input(
+ls_InputPin node_indexed_input(
         struct LabSoundAPI_1_0* ls,
         ls_Node n, int index)
 {
     auto ln = ls_node(ls, n);
     if (!ln)
-        return ls_Pin_empty;
+        return ls_InputPin_empty;
 
     if (ln->numberOfInputs() <= index)
-        return ls_Pin_empty;
+        return ls_InputPin_empty;
 
     string name = ln->input(index)->name();
     string path = string(ln->name()) + "(" + name;
@@ -318,7 +340,7 @@ ls_Pin node_indexed_input(
     // return the pin if it's pin looked up already
     ecs_entity_t e = ecs_lookup(ls->_detail->ecs, path.c_str());
     if (e)
-        return ls_Pin { e };
+        return ls_InputPin { e };
 
     // create the input pin on the fly
     e_Input eIn { n, index };
@@ -333,15 +355,15 @@ ls_Pin node_indexed_input(
     ecs_add_pair(ls->_detail->ecs, n.id, ls->_detail->has_input_rel, e);
     ecs_add_pair(ls->_detail->ecs, e, EcsChildOf, n.id); // autodelete
 
-    return ls_Pin { e };
+    return ls_InputPin { e };
 }
 
-ls_Pin node_named_output(struct LabSoundAPI_1_0* ls,
+ls_OutputPin node_named_output(struct LabSoundAPI_1_0* ls,
     ls_Node n, ls_StringSlice str) 
 {
     auto ln = ls_node(ls, n);
     if (!ln)
-        return ls_Pin_empty;
+        return ls_OutputPin_empty;
 
     string name(str.start, str.end - str.start);
     string path = string(ln->name()) + ")" + name;
@@ -349,7 +371,7 @@ ls_Pin node_named_output(struct LabSoundAPI_1_0* ls,
     // return the pin if it's pin looked up already
     ecs_entity_t e = ecs_lookup(ls->_detail->ecs, path.c_str());
     if (e)
-        return ls_Pin { e };
+        return ls_OutputPin { e };
 
     // create the output pin on the fly
     int ic = ln->numberOfOutputs();
@@ -368,22 +390,22 @@ ls_Pin node_named_output(struct LabSoundAPI_1_0* ls,
             ecs_add_pair(ls->_detail->ecs, n.id, ls->_detail->has_output_rel, e);
             ecs_add_pair(ls->_detail->ecs, e, EcsChildOf, n.id); // autodelete
 
-            return ls_Pin { e };
+            return ls_OutputPin { e };
         }
         ++index;
     }
-    return ls_Pin_empty;
+    return ls_OutputPin_empty;
 }
 
-ls_Pin node_indexed_output(struct LabSoundAPI_1_0* ls,
+ls_OutputPin node_indexed_output(struct LabSoundAPI_1_0* ls,
     ls_Node n, int index) 
 {
     auto ln = ls_node(ls, n);
     if (!ln)
-        return ls_Pin_empty;
+        return ls_OutputPin_empty;
 
     if (index >= ln->numberOfOutputs())
-        return ls_Pin_empty;
+        return ls_OutputPin_empty;
 
     string name = ln->output(index)->name();
     string path = string(ln->name()) + ")" + name;
@@ -391,7 +413,7 @@ ls_Pin node_indexed_output(struct LabSoundAPI_1_0* ls,
     // return the pin if it's pin looked up already
     ecs_entity_t e = ecs_lookup(ls->_detail->ecs, path.c_str());
     if (e)
-        return ls_Pin { e };
+        return ls_OutputPin { e };
 
     // create the input pin on the fly
     e_Output eOut { n, index };
@@ -406,15 +428,15 @@ ls_Pin node_indexed_output(struct LabSoundAPI_1_0* ls,
     ecs_add_pair(ls->_detail->ecs, n.id, ls->_detail->has_output_rel, e);
     ecs_add_pair(ls->_detail->ecs, e, EcsChildOf, n.id); // autodelete
 
-    return ls_Pin { e };
+    return ls_OutputPin { e };
 }
 
-ls_Pin node_parameter(struct LabSoundAPI_1_0* ls,
+ls_InputPin node_parameter(struct LabSoundAPI_1_0* ls,
     ls_Node n, ls_StringSlice name)
 {
     auto ln = ls_node(ls, n);
     if (!ln)
-        return ls_Pin_empty;
+        return ls_InputPin_empty;
 
     string nameStr(name.start, name.end - name.start);
     string path = string(ln->name()) + "*" + nameStr;
@@ -422,11 +444,11 @@ ls_Pin node_parameter(struct LabSoundAPI_1_0* ls,
     // return the pin if it's pin looked up already
     ecs_entity_t e = ecs_lookup(ls->_detail->ecs, path.c_str());
     if (e)
-        return ls_Pin { e };
+        return ls_InputPin { e };
 
     int param = ln->param_index(nameStr.c_str());
     if (param < 0)
-        return ls_Pin_empty;
+        return ls_InputPin_empty;
 
     e_Param eParam { n, param };
     ecs_entity_desc_t desc = { 0 };
@@ -440,15 +462,15 @@ ls_Pin node_parameter(struct LabSoundAPI_1_0* ls,
     ecs_add_pair(ls->_detail->ecs, n.id, ls->_detail->has_param_rel, e);
     ecs_add_pair(ls->_detail->ecs, e, EcsChildOf, n.id); // autodelete
 
-    return ls_Pin { e };
+    return ls_InputPin { e };
 }
 
-ls_Pin node_setting(struct LabSoundAPI_1_0* ls,
+ls_InputPin node_setting(struct LabSoundAPI_1_0* ls,
     ls_Node n, ls_StringSlice name)
 {
     auto ln = ls_node(ls, n);
     if (!ln)
-        return ls_Pin_empty;
+        return ls_InputPin_empty;
 
     string nameStr(name.start, name.end - name.start); 
     string path = string(ln->name()) + string("@") + nameStr;
@@ -457,11 +479,11 @@ ls_Pin node_setting(struct LabSoundAPI_1_0* ls,
     auto w = ls->_detail->ecs;
     ecs_entity_t e = ecs_lookup(w, path.c_str());
     if (e)
-        return ls_Pin { e };
+        return ls_InputPin { e };
 
     int setting = ln->setting_index(nameStr.c_str());
     if (setting < 0)
-        return ls_Pin_empty;
+        return ls_InputPin_empty;
 
     e_Setting eSetting { n, setting };
     ecs_entity_desc_t desc = { 0 };
@@ -475,7 +497,7 @@ ls_Pin node_setting(struct LabSoundAPI_1_0* ls,
     ecs_add_pair(w, n.id, ls->_detail->has_setting_rel, e);
     ecs_add_pair(w, e, EcsChildOf, n.id); // autodelete
 
-    return ls_Pin { e };
+    return ls_InputPin { e };
 }
 
 void node_set_on_ended(struct LabSoundAPI_1_0* ls,
@@ -494,25 +516,25 @@ void node_set_on_ended(struct LabSoundAPI_1_0* ls,
 
 
 ls_PinKind pin_kind(struct LabSoundAPI_1_0* ls,
-    ls_Pin p)
+    ls_InputPin p)
 {
     auto w = ls->_detail->ecs;
     if (!ecs_is_alive(w, p.id))
-        return ls_PinInvalid; 
+        return ls_PinKindInvalid;
 
     const e_Input* ei = ecs_get(w, p.id, e_Input);
-    if (ei) return ls_PinInput;
+    if (ei) return ls_PinKindInput;
     const e_Output* eo = ecs_get(w, p.id, e_Output);
-    if (eo) return ls_PinOutput;
+    if (eo) return ls_PinKindOutput;
     const e_Param* ep = ecs_get(w, p.id, e_Param);
-    if (eo) return ls_PinParam;
+    if (eo) return ls_PinKindParam;
     const e_Setting* es = ecs_get(w, p.id, e_Setting);
-    if (es) return ls_PinSetting;
-    return ls_PinInvalid;
+    if (es) return ls_PinKindSetting;
+    return ls_PinKindInvalid;
 }
 
 ls_PinDataType pin_data_type(struct LabSoundAPI_1_0* ls,
-    ls_Pin p) 
+    ls_InputPin p)
 {
     auto w = ls->_detail->ecs;
     if (!ecs_is_alive(w, p.id))
@@ -665,7 +687,7 @@ void create_node_output(
 // setting and getting pin values
 //
 void set_float(struct LabSoundAPI_1_0* ls,
-    ls_Pin p, float val)
+    ls_InputPin p, float val)
 {
     auto w = ls->_detail->ecs;
 
@@ -686,7 +708,7 @@ void set_float(struct LabSoundAPI_1_0* ls,
 }
 
 void set_int(struct LabSoundAPI_1_0* ls,
-    ls_Pin p, uint32_t i)
+    ls_InputPin p, uint32_t i)
 {
     auto w = ls->_detail->ecs;
     if (!ecs_is_alive(w, p.id))
@@ -701,7 +723,7 @@ void set_int(struct LabSoundAPI_1_0* ls,
 }
 
 void set_enum(struct LabSoundAPI_1_0* ls,
-    ls_Pin p, uint32_t i)
+    ls_InputPin p, uint32_t i)
 {
     auto w = ls->_detail->ecs;
     if (!ecs_is_alive(w, p.id))
@@ -716,7 +738,7 @@ void set_enum(struct LabSoundAPI_1_0* ls,
 }
 
 void set_named_enum(struct LabSoundAPI_1_0* ls,
-    ls_Pin p, ls_StringSlice enum_name)
+    ls_InputPin p, ls_StringSlice enum_name)
 {
     auto w = ls->_detail->ecs;
     if (!ecs_is_alive(w, p.id))
@@ -733,7 +755,7 @@ void set_named_enum(struct LabSoundAPI_1_0* ls,
 }
 
 void set_bool(struct LabSoundAPI_1_0* ls,
-    ls_Pin p, bool b)
+    ls_InputPin p, bool b)
 {
     auto w = ls->_detail->ecs;
     if (!ecs_is_alive(w, p.id))
@@ -748,7 +770,7 @@ void set_bool(struct LabSoundAPI_1_0* ls,
 }
 
 void set_bus(struct LabSoundAPI_1_0* ls,
-    ls_Pin p, ls_BusData d)
+    ls_InputPin p, ls_BusData d)
 {
     auto w = ls->_detail->ecs;
     if (!ecs_is_alive(w, p.id) || !ecs_is_alive(w, d.id))
@@ -769,7 +791,7 @@ void set_bus(struct LabSoundAPI_1_0* ls,
 }
 
 void set_bus_from_file(struct LabSoundAPI_1_0* ls,
-    ls_Pin p, ls_StringSlice path)
+    ls_InputPin p, ls_StringSlice path)
 {
     auto w = ls->_detail->ecs;
     if (!ecs_is_alive(w, p.id))
@@ -787,16 +809,16 @@ void set_bus_from_file(struct LabSoundAPI_1_0* ls,
     }
 }
 
-ls_Node device_node(struct LabSoundAPI_1_0* ls)
+ls_Node destination_node(struct LabSoundAPI_1_0* ls)
 {
-    return ls->_detail->device_node;
+    return ls->_detail->destination_node;
 }
 
 
 // graph management
 //
-ls_Connection connect_output_to_input(struct LabSoundAPI_1_0* ls,
-    ls_Pin input, ls_Pin output)
+ls_Connection connect(struct LabSoundAPI_1_0* ls,
+    ls_InputPin input, ls_OutputPin output)
 {
     auto w = ls->_detail->ecs;
     if (!ecs_is_alive(w, input.id) || !ecs_is_alive(w, output.id))
@@ -999,7 +1021,8 @@ struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc alloc) {
     app.enable_rest = true;
     ecs_app_run(api->_detail->ecs, &app);
 
-    e_Node en = { 1 };
+    api->_detail->next_id = 1;
+    e_Node en = { api->_detail->next_id };
     ecs_entity_desc_t desc = { 0 };
     desc.name = "Device Node";
     auto e = ecs_entity_init(api->_detail->ecs, &desc);
@@ -1007,18 +1030,20 @@ struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc alloc) {
     ecs_set_id(api->_detail->ecs, e,
         ecs_id(e_Node), sizeof(en), &en);
 
-    api->_detail->nodes.insert({ 1, api->_detail->ac->destinationNode() });
-    api->_detail->device_node = { e };
-    api->_detail->next_id = 2;
+    api->_detail->nodes.insert({ api->_detail->next_id, api->_detail->ac->destinationNode() });
+    api->_detail->destination_node = { e };
+    api->_detail->next_id++;
 
     using namespace ls_1_0;
 
     // operations on nodes
     //
+    api->node_diagnose = node_diagnose;
     api->node_get_timing = node_get_timing;
     api->node_get_self_timing = node_get_self_timing;
     api->node_start = node_start;
     api->node_schedule = node_schedule;
+    api->node_scheduled_state_name = node_scheduled_state_name;
     api->node_stop = node_stop;
 
     // getting pins from nodes
@@ -1056,8 +1081,8 @@ struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc alloc) {
 
     // graph management
     //
-    api->device_node = device_node;
-    api->connect_output_to_input = connect_output_to_input;
+    api->destination_node = destination_node;
+    api->connect = connect;
     api->disconnect = disconnect;
     return api;
 }    

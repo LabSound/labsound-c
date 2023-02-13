@@ -8,9 +8,9 @@ set(CMAKE_INSTALL_MESSAGE LAZY)
 set(LABSOUNDCDEMO_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 configure_file("${LABSOUNDCDEMO_ROOT}/LabSoundDemo.config.h" "${LABSOUNDCDEMO_ROOT}/LabSoundDemo.h" @ONLY)
 
-find_package(libnyquist)
-find_package(LabSound)
-find_package(LabSoundRtAudio)
+find_package(libnyquist REQUIRED)
+find_package(LabSound REQUIRED)
+find_package(LabSoundRtAudio REQUIRED)
 
 if (APPLE)
     set(PLATFORM_LIBS
