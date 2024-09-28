@@ -1,21 +1,30 @@
 # LabSound C bindings
 
-These bindings are compatible with top of tree LabSound. They will also work with upcoming release 1.3.0.
+These C bindings are compatible with top of tree LabSound.
+
+The beginnings of a Python wrapper is included, but not
+yet compiling. Help welcome :)
 
 copyright (c) 2022- Nick Porcino
 MIT License
 
 ## Getting Started
 
-To build the demo, install LabSound. Installing LabSound will also install libnyquist. Use cmake to configure this project, with a CMAKE_SYSTEM_PREFIX set to the install prefix used for LabSound.
+To build the bindings and demo with an existing LabSound installation, set
+`-DCMAKE_SYSTEM_PREFIX=/path/to/installRoot`. If this path is not provided,
+the build will automatically fetch LabSound.
 
-To use the bindings in your own project, include labsound-c.cpp into your project directly, and also link to libnyquist and LabSound.
+To use the bindings in your own project, include labsound-c.cpp into your 
+project directly, and also link to libnyquist and LabSound.
 
 ## Interface
 
-Strings are supplied to labsound-c via string slices. These are compatible with all languages you are likely to bind LabSound to, as there is no requirement that the string be zero terminated.
+Although labsound-c.cpp is implemented in C++, the interface in labsound-c.h 
+exposes symbols for C.
 
-Although labsound-c.cpp is implemented in C++, the interface in labsound-c.h exposes symbols for C.
+Strings are supplied to labsound-c via string slices. These are compatible with
+all languages you are likely to bind LabSound to, as there is no requirement 
+that the string be zero terminated.
 
 ```c
 typedef struct {
@@ -33,12 +42,13 @@ typedef struct {
 } ls_NameArray;
 ```
 
-For C users, there is a convenience function ~ 
+For cstd users, there is a convenience function ~ 
+
 ```c
 #define ls_cstr(s) ls_StringSlice { (s), strlen(s) }
 ```
 
-Time is passed in a simple struct ~
+Time is passed in a simple struct to force a descriptive type ~
 
 ```c
 typedef struct {
@@ -46,7 +56,8 @@ typedef struct {
 } ls_Seconds;
 ```
 
-There are a variety of opaque lsc objects that the labsound-c interfaces will consume.
+There are a variety of opaque LabSound C objects that the labsound-c
+interfaces will consume.
 
 ```c
 struct ls_Pin, ls_Node, ls_Connection, ls_BusData;
@@ -66,7 +77,9 @@ typedef enum {
 } ls_PinDataType;
 ```
 
-There are some housekeeping routines. You'll need to create and release the LabSoundAPI_1_0 interface object, and once per frame call `ls_idle` to give the engine a chance to do various tasks.
+There are also some housekeeping routines. You'll need to create and release 
+the LabSoundAPI_1_0 interface object, and once per frame (eg. once a game frame at
+1/60s) call `ls_idle` to give the engine a chance to do various tasks.
 
 ```c
 
@@ -81,11 +94,17 @@ void ls_release_api_1_0(struct LabSoundAPI_1_0*);
 void ls_idle(struct LabSoundAPI_1_0*);
 ```
 
-The interface differs from the C++ interface. The C++ interface is an object oriented API meant to mimic the WebAudio specification's interfaces as closely as possible. The C interfaces however, are opaque, and not object oriented.
+The LabSound C interface differs greatly from the C++ interface. The C++ 
+interface is an object oriented API meant to mimic the WebAudio specification's 
+interfaces as closely as possible. The C interfaces however, are opaque, and 
+not object oriented.
+
+Nodes are created by name, and managed generically.
 
 Inputs and outputs from a node are accessed from pins, as are the node's properties.
 
-Instead, they are built around generic interfaces that rely on LabSounds additional C++ interfaces for querying capabilities and attributes.
+These are all built around generic interfaces that rely on LabSound's additional 
+C++ interfaces for querying capabilities and attributes.
 
 Please refer to the demo for usage examples.
 
