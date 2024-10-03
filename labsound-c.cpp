@@ -17,6 +17,7 @@ using std::string;
 using std::unordered_map;
 
 using namespace lab;
+using namespace LabSoundNS;
 
 struct e_Node {
     uint32_t hash_index;
@@ -106,8 +107,11 @@ inline std::pair<AudioStreamConfig, AudioStreamConfig>
     return {inputConfig, outputConfig};
 }
 
-struct LabSoundAPI_1_0_Detail {
+struct ls_APIDetail {
     shared_ptr<lab::AudioContext> ac;
+    shared_ptr<lab::AudioDestinationNode> dn;
+    shared_ptr<lab::AudioDevice_RtAudio> dv;
+
     ls_Alloc alloc;
     ls_Node destination_node;
     uint32_t next_id;
@@ -124,7 +128,7 @@ struct LabSoundAPI_1_0_Detail {
 
 namespace ls_1_0 {
 
-shared_ptr<lab::AudioNode> ls_node(struct LabSoundAPI_1_0* ls, const e_Node* id)
+shared_ptr<lab::AudioNode> ls_node(struct ls_API* ls, const e_Node* id)
 {
     if (!id)
         return {};
@@ -135,7 +139,7 @@ shared_ptr<lab::AudioNode> ls_node(struct LabSoundAPI_1_0* ls, const e_Node* id)
     return it->second;
 };
 
-shared_ptr<lab::AudioNode> ls_node(struct LabSoundAPI_1_0* ls, const ls_Node n)
+shared_ptr<lab::AudioNode> ls_node(struct ls_API* ls, const ls_Node n)
 {
     if (!ecs_is_alive(ls->_detail->ecs, n.id))
         return {};
@@ -144,7 +148,7 @@ shared_ptr<lab::AudioNode> ls_node(struct LabSoundAPI_1_0* ls, const ls_Node n)
     return ls_node(ls, node);
 };
 
-const e_Connection* ls_connection(struct LabSoundAPI_1_0* ls, const ls_Connection c)
+const e_Connection* ls_connection(struct ls_API* ls, const ls_Connection c)
 {
     auto w = ls->_detail->ecs;
     if (!ecs_is_alive(w, c.id))
@@ -165,10 +169,9 @@ const e_Connection* ls_connection(struct LabSoundAPI_1_0* ls, const ls_Connectio
     return ec;
 }
 
-
 // operations on nodes
 //
-ls_Seconds node_get_timing(struct LabSoundAPI_1_0* ls,
+ls_Seconds node_get_timing(struct ls_API* ls,
     ls_Node n) 
 {
    auto ln = ls_node(ls, n);
@@ -178,7 +181,7 @@ ls_Seconds node_get_timing(struct LabSoundAPI_1_0* ls,
    return ls_Seconds{ ln->graphTime().microseconds.count() * 1.e-6f };
 }
 
-ls_Seconds node_get_self_timing(struct LabSoundAPI_1_0* ls,
+ls_Seconds node_get_self_timing(struct ls_API* ls,
     ls_Node n) 
 {
     auto ln = ls_node(ls, n);
@@ -189,7 +192,7 @@ ls_Seconds node_get_self_timing(struct LabSoundAPI_1_0* ls,
                       ln->graphTime().microseconds.count() * 1.e-6f };
 }
 
-void node_start(struct LabSoundAPI_1_0* ls,
+void node_start(struct ls_API* ls,
     ls_Node n, ls_Seconds when) 
 {
     auto ln = ls_node(ls, n);
@@ -211,7 +214,7 @@ void node_start(struct LabSoundAPI_1_0* ls,
    asn->start(when.t);
 }
 
-void node_diagnose(struct LabSoundAPI_1_0* ls, ls_Node n)
+void node_diagnose(struct ls_API* ls, ls_Node n)
 {
     auto ln = ls_node(ls, n);
     if (!ln)
@@ -221,7 +224,7 @@ void node_diagnose(struct LabSoundAPI_1_0* ls, ls_Node n)
     ac.diagnose(ln);
 }
 
-void node_schedule(struct LabSoundAPI_1_0* ls,
+void node_schedule(struct ls_API* ls,
     ls_Node n, ls_Seconds when, int count)
 {
     if (!count)
@@ -246,7 +249,7 @@ void node_schedule(struct LabSoundAPI_1_0* ls,
     asn->start(when.t); // disregarding count.
 }
 
-const char* node_scheduled_state_name(struct LabSoundAPI_1_0* ls,
+const char* node_scheduled_state_name(struct ls_API* ls,
                                          ls_Node n)
 {
     auto ln = ls_node(ls, n);
@@ -257,7 +260,7 @@ const char* node_scheduled_state_name(struct LabSoundAPI_1_0* ls,
 }
 
 
-void node_stop(struct LabSoundAPI_1_0* ls,
+void node_stop(struct ls_API* ls,
     ls_Node n, ls_Seconds when) 
 {
     auto ln = ls_node(ls, n);
@@ -283,7 +286,7 @@ void node_stop(struct LabSoundAPI_1_0* ls,
 // getting pins from nodes
 //
 ls_InputPin node_named_input(
-        struct LabSoundAPI_1_0* ls,
+        struct ls_API* ls,
         ls_Node n, ls_StringSlice str) 
 {
     auto ln = ls_node(ls, n);
@@ -324,7 +327,7 @@ ls_InputPin node_named_input(
 }
 
 ls_InputPin node_indexed_input(
-        struct LabSoundAPI_1_0* ls,
+        struct ls_API* ls,
         ls_Node n, int index)
 {
     auto ln = ls_node(ls, n);
@@ -358,7 +361,7 @@ ls_InputPin node_indexed_input(
     return ls_InputPin { e };
 }
 
-ls_OutputPin node_named_output(struct LabSoundAPI_1_0* ls,
+ls_OutputPin node_named_output(struct ls_API* ls,
     ls_Node n, ls_StringSlice str) 
 {
     auto ln = ls_node(ls, n);
@@ -397,7 +400,7 @@ ls_OutputPin node_named_output(struct LabSoundAPI_1_0* ls,
     return ls_OutputPin_empty;
 }
 
-ls_OutputPin node_indexed_output(struct LabSoundAPI_1_0* ls,
+ls_OutputPin node_indexed_output(struct ls_API* ls,
     ls_Node n, int index) 
 {
     auto ln = ls_node(ls, n);
@@ -431,7 +434,7 @@ ls_OutputPin node_indexed_output(struct LabSoundAPI_1_0* ls,
     return ls_OutputPin { e };
 }
 
-ls_InputPin node_parameter(struct LabSoundAPI_1_0* ls,
+ls_InputPin node_parameter(struct ls_API* ls,
     ls_Node n, ls_StringSlice name)
 {
     auto ln = ls_node(ls, n);
@@ -465,7 +468,7 @@ ls_InputPin node_parameter(struct LabSoundAPI_1_0* ls,
     return ls_InputPin { e };
 }
 
-ls_InputPin node_setting(struct LabSoundAPI_1_0* ls,
+ls_InputPin node_setting(struct ls_API* ls,
     ls_Node n, ls_StringSlice name)
 {
     auto ln = ls_node(ls, n);
@@ -500,7 +503,7 @@ ls_InputPin node_setting(struct LabSoundAPI_1_0* ls,
     return ls_InputPin { e };
 }
 
-void node_set_on_ended(struct LabSoundAPI_1_0* ls,
+void node_set_on_ended(struct ls_API* ls,
     ls_Node n, void(*fn)())
 {
     auto ln = ls_node(ls, n);
@@ -515,7 +518,7 @@ void node_set_on_ended(struct LabSoundAPI_1_0* ls,
 }
 
 
-ls_PinKind pin_kind(struct LabSoundAPI_1_0* ls,
+ls_PinKind pin_kind(struct ls_API* ls,
     ls_InputPin p)
 {
     auto w = ls->_detail->ecs;
@@ -533,7 +536,7 @@ ls_PinKind pin_kind(struct LabSoundAPI_1_0* ls,
     return ls_PinKindInvalid;
 }
 
-ls_PinDataType pin_data_type(struct LabSoundAPI_1_0* ls,
+ls_PinDataType pin_data_type(struct ls_API* ls,
     ls_InputPin p)
 {
     auto w = ls->_detail->ecs;
@@ -571,7 +574,7 @@ ls_PinDataType pin_data_type(struct LabSoundAPI_1_0* ls,
 
 // managing nodes
 //
-const ls_NameArray* node_names(struct LabSoundAPI_1_0* ls)
+const ls_NameArray* node_names(struct ls_API* ls)
 {
     static auto src_names = lab::NodeRegistry::Instance().Names();
     static ls_NameArray names;
@@ -588,7 +591,7 @@ const ls_NameArray* node_names(struct LabSoundAPI_1_0* ls)
     return &names;
 }
 
-ls_Node node_create(struct LabSoundAPI_1_0* ls, 
+ls_Node node_create(struct ls_API* ls, 
     ls_StringSlice name, ls_StringSlice type)
 {
     string n(type.start, type.end - type.start);
@@ -611,7 +614,7 @@ ls_Node node_create(struct LabSoundAPI_1_0* ls,
     return ls_Node { e };
 }
 
-void node_delete(struct LabSoundAPI_1_0* ls,
+void node_delete(struct ls_API* ls,
     ls_Node n)
 {
     auto w = ls->_detail->ecs;
@@ -661,7 +664,7 @@ void node_delete(struct LabSoundAPI_1_0* ls,
 }
 
 void create_node_output(
-        struct LabSoundAPI_1_0* ls,
+        struct ls_API* ls,
         ls_Node n, ls_StringSlice name, int channels)
 {
     auto w = ls->_detail->ecs;
@@ -686,7 +689,7 @@ void create_node_output(
 
 // setting and getting pin values
 //
-void set_float(struct LabSoundAPI_1_0* ls,
+void set_float(struct ls_API* ls,
     ls_InputPin p, float val)
 {
     auto w = ls->_detail->ecs;
@@ -707,7 +710,7 @@ void set_float(struct LabSoundAPI_1_0* ls,
     }
 }
 
-void set_int(struct LabSoundAPI_1_0* ls,
+void set_int(struct ls_API* ls,
     ls_InputPin p, uint32_t i)
 {
     auto w = ls->_detail->ecs;
@@ -722,7 +725,7 @@ void set_int(struct LabSoundAPI_1_0* ls,
     }
 }
 
-void set_enum(struct LabSoundAPI_1_0* ls,
+void set_enum(struct ls_API* ls,
     ls_InputPin p, uint32_t i)
 {
     auto w = ls->_detail->ecs;
@@ -737,7 +740,7 @@ void set_enum(struct LabSoundAPI_1_0* ls,
     }
 }
 
-void set_named_enum(struct LabSoundAPI_1_0* ls,
+void set_named_enum(struct ls_API* ls,
     ls_InputPin p, ls_StringSlice enum_name)
 {
     auto w = ls->_detail->ecs;
@@ -754,7 +757,7 @@ void set_named_enum(struct LabSoundAPI_1_0* ls,
     }
 }
 
-void set_bool(struct LabSoundAPI_1_0* ls,
+void set_bool(struct ls_API* ls,
     ls_InputPin p, bool b)
 {
     auto w = ls->_detail->ecs;
@@ -769,7 +772,7 @@ void set_bool(struct LabSoundAPI_1_0* ls,
      }
 }
 
-void set_bus(struct LabSoundAPI_1_0* ls,
+void set_bus(struct ls_API* ls,
     ls_InputPin p, ls_BusData d)
 {
     auto w = ls->_detail->ecs;
@@ -790,7 +793,7 @@ void set_bus(struct LabSoundAPI_1_0* ls,
     }
 }
 
-void set_bus_from_file(struct LabSoundAPI_1_0* ls,
+void set_bus_from_file(struct ls_API* ls,
     ls_InputPin p, ls_StringSlice path)
 {
     auto w = ls->_detail->ecs;
@@ -809,7 +812,7 @@ void set_bus_from_file(struct LabSoundAPI_1_0* ls,
     }
 }
 
-ls_Node destination_node(struct LabSoundAPI_1_0* ls)
+ls_Node destination_node(struct ls_API* ls)
 {
     return ls->_detail->destination_node;
 }
@@ -817,7 +820,7 @@ ls_Node destination_node(struct LabSoundAPI_1_0* ls)
 
 // graph management
 //
-ls_Connection connect(struct LabSoundAPI_1_0* ls,
+ls_Connection connect(struct ls_API* ls,
     ls_InputPin input, ls_OutputPin output)
 {
     auto w = ls->_detail->ecs;
@@ -883,7 +886,7 @@ ls_Connection connect(struct LabSoundAPI_1_0* ls,
     return lc;
 }
 
-void disconnect(struct LabSoundAPI_1_0* ls,
+void disconnect(struct ls_API* ls,
     ls_Connection c)
 {
     const e_Connection* ec = ls_connection(ls, c);
@@ -915,7 +918,7 @@ int ecs_run_action(
         desc->init(world);
     }
 
-    auto api = (LabSoundAPI_1_0*)desc->ctx;
+    auto api = (ls_API*)desc->ctx;
     api->_detail->desc = *desc;
 
     return ecs_app_run_frame(world, desc) == 0;
@@ -923,7 +926,7 @@ int ecs_run_action(
 
 
 static
-ls_BusData bus_create_from_file(struct LabSoundAPI_1_0* ls, 
+ls_BusData bus_create_from_file(struct ls_API* ls, 
     const char* name, bool mix_to_mono)
 {
     const std::string path(name);
@@ -954,7 +957,7 @@ ls_BusData bus_create_from_file(struct LabSoundAPI_1_0* ls,
 } // namespace ls_1_0
 
 extern "C"
-void ls_idle(struct LabSoundAPI_1_0* ls) {
+void ls_idle(struct ls_API* ls) {
     if (!ls || !ls->_detail->ecs)
         return;
 
@@ -963,20 +966,20 @@ void ls_idle(struct LabSoundAPI_1_0* ls) {
 
 
 extern "C"
-struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc alloc) {
+struct ls_API* ls_create_api_1_0(ls_Alloc alloc) {
 
-    LabSoundAPI_1_0* api = (LabSoundAPI_1_0*) 
-        alloc.malloc(sizeof(LabSoundAPI_1_0));
+    ls_API* api = (ls_API*) 
+        alloc.malloc(sizeof(ls_API));
     if (!api)
         return nullptr;
 
-    memset(api, 0, sizeof(LabSoundAPI_1_0));
-    api->_detail = (LabSoundAPI_1_0_Detail*)
-        alloc.malloc(sizeof(LabSoundAPI_1_0_Detail));
+    memset(api, 0, sizeof(ls_API));
+    api->_detail = (ls_APIDetail*)
+        alloc.malloc(sizeof(ls_APIDetail));
     if (!api->_detail)
         return nullptr;
-    memset(api->_detail, 0, sizeof(LabSoundAPI_1_0_Detail));
-    new(api->_detail) LabSoundAPI_1_0_Detail();
+    memset(api->_detail, 0, sizeof(ls_APIDetail));
+    new(api->_detail) ls_APIDetail();
     api->_detail->alloc = alloc;
 
     AudioStreamConfig _inputConfig;
@@ -989,6 +992,8 @@ struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc alloc) {
     auto destinationNode = std::make_shared<lab::AudioDestinationNode>(*context.get(), device);
     device->setDestinationNode(destinationNode);
     context->setDestinationNode(destinationNode);
+    api->_detail->dv = device;
+    api->_detail->dn = destinationNode;
     api->_detail->ac = context;
 
     api->_detail->ecs = ecs_init();
@@ -1085,5 +1090,24 @@ struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc alloc) {
     api->connect = connect;
     api->disconnect = disconnect;
     return api;
+}    
+
+extern "C"
+void ls_release_api_1_0(struct ls_API* api) {
+    if (!api)
+        return;
+    
+    ecs_fini(api->_detail->ecs);
+
+    auto alloc = api->_detail->alloc;
+
+    // device, context, and rendernode are circularly referenced, so break the cycle manually.
+    api->_detail->dn.reset();
+    api->_detail->ac->setDestinationNode(api->_detail->dn);
+    api->_detail->dv->setDestinationNode(api->_detail->dn);
+
+    api->_detail->~ls_APIDetail();
+    alloc.free(api->_detail);
+    alloc.free(api);
 }    
 

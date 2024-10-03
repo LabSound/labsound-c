@@ -78,7 +78,7 @@ typedef enum {
 ```
 
 There are also some housekeeping routines. You'll need to create and release 
-the LabSoundAPI_1_0 interface object, and once per frame (eg. once a game frame at
+the ls_API interface object, and once per frame (eg. once a game frame at
 1/60s) call `ls_idle` to give the engine a chance to do various tasks.
 
 ```c
@@ -89,9 +89,9 @@ typedef struct {
 } ls_Alloc;
 const ls_Alloc ls_default_alloc = { malloc, free };
 
-struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc);
-void ls_release_api_1_0(struct LabSoundAPI_1_0*);
-void ls_idle(struct LabSoundAPI_1_0*);
+struct ls_API* ls_create_api_1_0(ls_Alloc);
+void ls_release_api_1_0(struct ls_API*);
+void ls_idle(struct ls_API*);
 ```
 
 The LabSound C interface differs greatly from the C++ interface. The C++ 
@@ -110,49 +110,49 @@ Please refer to the demo for usage examples.
 
 ```c
     // scheduling nodes
-    ls_Seconds (*node_get_timing)(struct LabSoundAPI_1_0*, ls_Node);
-    ls_Seconds (*node_get_self_timing)(struct LabSoundAPI_1_0*, ls_Node);
-    void (*node_start)(struct LabSoundAPI_1_0*, ls_Node, ls_Seconds);
-    void (*node_schedule)(struct LabSoundAPI_1_0*, ls_Node, ls_Seconds, int32_t);
-    void (*node_stop)(struct LabSoundAPI_1_0*, ls_Node, ls_Seconds);
+    ls_Seconds (*node_get_timing)(struct ls_API*, ls_Node);
+    ls_Seconds (*node_get_self_timing)(struct ls_API*, ls_Node);
+    void (*node_start)(struct ls_API*, ls_Node, ls_Seconds);
+    void (*node_schedule)(struct ls_API*, ls_Node, ls_Seconds, int32_t);
+    void (*node_stop)(struct ls_API*, ls_Node, ls_Seconds);
 
     // managing nodes
-    const ls_NameArray* (*node_names)(struct LabSoundAPI_1_0*);
-    ls_Node (*node_create)(struct LabSoundAPI_1_0*, ls_StringSlice name, ls_StringSlice type);
-    void (*node_delete)(struct LabSoundAPI_1_0*, ls_Node);
-    void (*create_node_output)(struct LabSoundAPI_1_0*, ls_Node, ls_StringSlice name, int channels);
-    void (*node_set_on_ended)(struct LabSoundAPI_1_0*, ls_Node, void(*)());
+    const ls_NameArray* (*node_names)(struct ls_API*);
+    ls_Node (*node_create)(struct ls_API*, ls_StringSlice name, ls_StringSlice type);
+    void (*node_delete)(struct ls_API*, ls_Node);
+    void (*create_node_output)(struct ls_API*, ls_Node, ls_StringSlice name, int channels);
+    void (*node_set_on_ended)(struct ls_API*, ls_Node, void(*)());
 
     // getting pins from nodes
-    ls_Pin (*node_named_input)(struct LabSoundAPI_1_0*, ls_Node, ls_StringSlice);
-    ls_Pin (*node_indexed_input)(struct LabSoundAPI_1_0*, ls_Node, int);
-    ls_Pin (*node_named_output)(struct LabSoundAPI_1_0*, ls_Node, ls_StringSlice);
-    ls_Pin (*node_indexed_output)(struct LabSoundAPI_1_0*, ls_Node, int);
-    ls_Pin (*node_parameter)(struct LabSoundAPI_1_0*, ls_Node, ls_StringSlice);
-    ls_Pin (*node_setting)(struct LabSoundAPI_1_0*, ls_Node, ls_StringSlice);
+    ls_Pin (*node_named_input)(struct ls_API*, ls_Node, ls_StringSlice);
+    ls_Pin (*node_indexed_input)(struct ls_API*, ls_Node, int);
+    ls_Pin (*node_named_output)(struct ls_API*, ls_Node, ls_StringSlice);
+    ls_Pin (*node_indexed_output)(struct ls_API*, ls_Node, int);
+    ls_Pin (*node_parameter)(struct ls_API*, ls_Node, ls_StringSlice);
+    ls_Pin (*node_setting)(struct ls_API*, ls_Node, ls_StringSlice);
 
     // information about pins
-    ls_PinKind (*pin_kind)(struct LabSoundAPI_1_0*, ls_Pin);
-    ls_PinDataType (*pin_data_type)(struct LabSoundAPI_1_0*, ls_Pin);
+    ls_PinKind (*pin_kind)(struct ls_API*, ls_Pin);
+    ls_PinDataType (*pin_data_type)(struct ls_API*, ls_Pin);
 
     // setting and getting pin values
     // note - these interfaces are going to be prefixed with pin_
-    void (*set_float)(struct LabSoundAPI_1_0*, ls_Pin, float);
-    void (*set_enum)(struct LabSoundAPI_1_0*, ls_Pin, uint32_t);
-    void (*set_int)(struct LabSoundAPI_1_0*, ls_Pin, uint32_t);
-    void (*set_bool)(struct LabSoundAPI_1_0*, ls_Pin, bool);
-    void (*set_bus)(struct LabSoundAPI_1_0*, ls_Pin, ls_BusData);
-    void (*set_bus_from_file)(struct LabSoundAPI_1_0*, ls_Pin, ls_StringSlice path);
-    void (*set_named_enum)(struct LabSoundAPI_1_0*, ls_Pin, ls_StringSlice enum_name);
+    void (*set_float)(struct ls_API*, ls_Pin, float);
+    void (*set_enum)(struct ls_API*, ls_Pin, uint32_t);
+    void (*set_int)(struct ls_API*, ls_Pin, uint32_t);
+    void (*set_bool)(struct ls_API*, ls_Pin, bool);
+    void (*set_bus)(struct ls_API*, ls_Pin, ls_BusData);
+    void (*set_bus_from_file)(struct ls_API*, ls_Pin, ls_StringSlice path);
+    void (*set_named_enum)(struct ls_API*, ls_Pin, ls_StringSlice enum_name);
 
     // managing busses
-    ls_BusData (*bus_create_from_file)(struct LabSoundAPI_1_0*, const char* path, bool mix_to_mono);
+    ls_BusData (*bus_create_from_file)(struct ls_API*, const char* path, bool mix_to_mono);
 
     // graph management
     // note - device_node is going to be renamed destination_node
-    ls_Node(*device_node)(struct LabSoundAPI_1_0*);
-    ls_Connection (*connect_output_to_input)(struct LabSoundAPI_1_0*, ls_Pin input, ls_Pin output);
+    ls_Node(*device_node)(struct ls_API*);
+    ls_Connection (*connect_output_to_input)(struct ls_API*, ls_Pin input, ls_Pin output);
 
     // after disconnection, ls_Connection will no longer be valid
-    void (*disconnect)(struct LabSoundAPI_1_0*, ls_Connection);
+    void (*disconnect)(struct ls_API*, ls_Connection);
 ```
