@@ -47,6 +47,9 @@ pub fn build(b: *std.build.Builder) void {
     exe.addIncludeDir("../LabSound/third_party/libnyquist/third_party/wavpack/include");
     exe.addIncludeDir("../LabSound/third_party/libnyquist/src");
     exe.addCSourceFile("labsound-c.cpp", &cpp_args);
+
+    exe.addSourceFile("src/labsound.zig");
+
     exe.addCSourceFile("../LabSound/src/backends/RtAudio/AudioDevice_RtAudio.cpp", &cpp_args);
     exe.addCSourceFile("../LabSound/src/backends/RtAudio/RtAudio.cpp", &cpp_args);
     exe.addCSourceFile("../LabSound/src/core/_SoundPipe_FFT.cpp", &cpp_args);
@@ -154,4 +157,3 @@ pub fn build(b: *std.build.Builder) void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&exe_tests.step);
 }
-
