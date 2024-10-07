@@ -58,6 +58,7 @@ const c_args = [_][]const u8{
 const cpp_args = [_][]const u8{
     "-std=c++17",
     "-fno-sanitize=undefined",
+    "-D__MACOSX_CORE__", // select a backend for RtAudio
 };
 
 pub fn build(b: *std.Build) void {
@@ -110,7 +111,9 @@ pub fn build(b: *std.Build) void {
     exe.addIncludePath(b.path("./"));
     exe.addIncludePath(b.path("build/_deps/labsound-src/include"));
     exe.addIncludePath(b.path("build/_deps/labsound-src/src"));
+    exe.addIncludePath(b.path("build/_deps/labsound-src/src/internal"));
     exe.addIncludePath(b.path("build/_deps/labsound-src/third_party"));
+    exe.addIncludePath(b.path("build/_deps/labsound-src/third_party/libsamplerate/include"));
     exe.addIncludePath(b.path("build/_deps/labsound-src/third_party/libnyquist/include"));
     exe.addIncludePath(b.path("build/_deps/labsound-src/third_party/libnyquist/include/libnyquist"));
     exe.addIncludePath(b.path("build/_deps/labsound-src/third_party/libnyquist/third_party"));
@@ -127,6 +130,7 @@ pub fn build(b: *std.Build) void {
     exe.addIncludePath(b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/opus/silk/float"));
     exe.addIncludePath(b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/include"));
     exe.addIncludePath(b.path("build/_deps/labsound-src/third_party/libnyquist/src"));
+
     exe.addCSourceFile(.{ .file = b.path("labsound-c.cpp"), .flags = &cpp_args});
 
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/backends/RtAudio/AudioDevice_RtAudio.cpp"), .flags = &cpp_args} );
@@ -139,27 +143,29 @@ pub fn build(b: *std.Build) void {
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/AudioChannel.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/AudioContext.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/AudioDevice.cpp"), .flags = &cpp_args });
-//    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/AudioHardwareDeviceNode.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/AudioHardwareInputNode.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/AudioListener.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/AudioNode.cpp"), .flags = &cpp_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/AudioNodeInput.cpp"), .flags = &cpp_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/AudioNodeOutput.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/AudioParam.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/AudioParamTimeline.cpp"), .flags = &cpp_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/AudioSummingJunction.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/BiquadFilterNode.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/ChannelMergerNode.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/ChannelSplitterNode.cpp"), .flags = &cpp_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/ConstantSourceNode.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/ConvolverNode.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/DelayNode.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/DynamicsCompressorNode.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/GainNode.cpp"), .flags = &cpp_args });
-//    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/NullDeviceNode.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/OscillatorNode.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/PannerNode.cpp"), .flags = &cpp_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/PeriodicWave.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/RealtimeAnalyser.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/SampledAudioNode.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/StereoPannerNode.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/WaveShaperNode.cpp"), .flags = &cpp_args });
- //   exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/core/WaveTable.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/extended/ADSRNode.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/extended/AudioFileReader.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/extended/BPMDelay.cpp"), .flags = &cpp_args });
@@ -187,18 +193,19 @@ pub fn build(b: *std.Build) void {
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/Cone.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/DelayDSPKernel.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/DelayProcessor.cpp"), .flags = &cpp_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/DirectConvolver.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/Distance.cpp"), .flags = &cpp_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/DownSampler.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/DynamicsCompressor.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/DynamicsCompressorKernel.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/EqualPowerPanner.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/FFTConvolver.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/FFTFrame.cpp"), .flags = &cpp_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/FFTFrameAppleAccelerate.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/FFTFrameKissFFT.cpp"), .flags = &cpp_args });
-//    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/HRTFDatabase.cpp"), .flags = &cpp_args });
-//    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/HRTFDatabaseLoader.cpp"), .flags = &cpp_args });
- //   exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/HRTFElevation.cpp"), .flags = &cpp_args });
- //   exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/HRTFKernel.cpp"), .flags = &cpp_args });
- //   exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/HRTFPanner.cpp"), .flags = &cpp_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/HRTFPanner.cpp"), .flags = &cpp_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/libSampleRate.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/UpSampler.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/VectorMath.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/src/internal/src/ZeroPole.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/src/Common.cpp"), .flags = &cpp_args });
@@ -214,11 +221,43 @@ pub fn build(b: *std.Build) void {
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/src/VorbisDependencies.c"), .flags = &c_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/src/WavDecoder.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/src/WavPackDecoder.cpp"), .flags = &cpp_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/common_utils.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/decorr_utils.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/entropy_utils.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/extra1.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/extra2.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/open_filename.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/open_utils.c"), .flags = &c_args });
+    //exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/open_legacy.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/open_raw.c"), .flags = &c_args });
+    //exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/pack_dns.c"), .flags = &c_args });
+    //exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/pack_dsd.c"), .flags = &c_args });
+    //exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/pack_floats.c"), .flags = &c_args });
+    //exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/pack.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/read_words.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/tag_utils.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/tags.c"), .flags = &c_args });
+    //exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/unpack_dsd.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/unpack_floats.c"), .flags = &c_args });
+    //exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/unpack_seek.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/unpack_utils.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/unpack.c"), .flags = &c_args });
+    //exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/unpack3_open.c"), .flags = &c_args });
+    //exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/unpack3_seek.c"), .flags = &c_args });
+    exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/libnyquist/third_party/wavpack/src/write_words.c"), .flags = &c_args });
     exe.addCSourceFile(.{ .file = b.path("build/_deps/labsound-src/third_party/ooura/src/fftsg.cpp"), .flags = &cpp_args });
     exe.addCSourceFile(.{ .file = b.path("./flecs.c"), .flags = &c_args });
     exe.linkLibC();
     exe.linkLibCpp();
     exe.linkSystemLibrary("c");
+
+    //switch (options.target.getOsTag()) {
+    //    .macos => {
+            exe.linkFramework("Accelerate");
+            exe.linkFramework("CoreAudio");
+            exe.linkFramework("Foundation");
+    //    }
+    //}
 
     // indicate that exe can be installed via `zig build install`
     const install_exe_artifact_step = &b.addInstallArtifact(exe, .{} ).step;

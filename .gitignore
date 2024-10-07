@@ -2,4 +2,4 @@
 .zig-cache/
 build/
 LabSoundDemo.h
-
+zig-out/
