@@ -4,6 +4,7 @@ const ls = @cImport({
     @cInclude("labsound-c.h");
 });
 
+const labsound = @import("labsound");
 
 pub fn main() anyerror!void {
     std.log.info("All your codebase are belong to us.", .{});
