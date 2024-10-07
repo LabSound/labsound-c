@@ -47,7 +47,7 @@ overhead.
 // conflicts. The default is ls_1_0_ to indicate the 1.0 version of LabSound.
 //
 #ifndef LSNAMESPACE
-#define LSNAMESPACE ls_1_0_
+//#define LSNAMESPACE ls_1_0_
 #endif
 
 // The LSCONCAT macro is used to apply a namespace to the symbols in the public
@@ -71,6 +71,7 @@ overhead.
 extern "C" {
 #endif
 
+#ifdef LSNAMESPACE
 // forward declare the LabSound C types in a namespace
 #define ls_StringSlice LSCONCAT(LSNAMESPACE, StringSlice)
 #define ls_NameArray LSCONCAT(LSNAMESPACE, NameArray)
@@ -82,7 +83,7 @@ extern "C" {
 #define ls_BusData LSCONCAT(LSNAMESPACE, BusData)
 #define ls_PinKind LSCONCAT(LSNAMESPACE, PinKind)
 #define ls_PinDataType LSCONCAT(LSNAMESPACE, PinDataType)
-
+#endif
 
 typedef struct {
     const char* start;

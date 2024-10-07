@@ -50,7 +50,7 @@ fn ensureZigVersion() !void {
 }
 
 const c_args = [_][]const u8{
-    "-D_MSC_VER",
+   // "-D_MSC_VER",
     "-std=c11",
     "-fno-sanitize=undefined",
 };
