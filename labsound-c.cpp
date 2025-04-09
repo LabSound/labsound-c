@@ -1087,3 +1087,15 @@ struct LabSoundAPI_1_0* ls_create_api_1_0(ls_Alloc alloc) {
     return api;
 }    
 
+extern "C"
+void ls_release_api_1_0(struct LabSoundAPI_1_0* api)
+{
+    if (!api || !api->_detail)
+        return;
+    auto fr = api->_detail->alloc.free;
+    if (!fr)
+        return;
+    fr(api->_detail);
+    fr(api);
+}
+
