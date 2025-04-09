@@ -1093,6 +1093,7 @@ struct ls_API* ls_create_api_1_0(ls_Alloc alloc) {
 }    
 
 extern "C"
+<<<<<<< HEAD
 void ls_release_api_1_0(struct ls_API* api) {
     if (!api)
         return;
@@ -1110,4 +1111,16 @@ void ls_release_api_1_0(struct ls_API* api) {
     alloc.free(api->_detail);
     alloc.free(api);
 }    
+=======
+void ls_release_api_1_0(struct LabSoundAPI_1_0* api)
+{
+    if (!api || !api->_detail)
+        return;
+    auto fr = api->_detail->alloc.free;
+    if (!fr)
+        return;
+    fr(api->_detail);
+    fr(api);
+}
+>>>>>>> swift
 
